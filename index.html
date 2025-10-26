@@ -29,7 +29,23 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <!-- Load PDF.js for PDF rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <!-- OCR functionality will use OCR.space API -->
+    
+    <!-- PaddleOCR Browser Dependencies -->
+    <!-- 1. ONNX Runtime (required for model inference) -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <!-- 2. OpenCV.js (required for image processing) -->
+    <!-- Note: OpenCV may show source map warnings in console - this is harmless -->
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript" 
+            onload="console.log('✅ OpenCV.js loaded')"
+            onerror="console.error('❌ OpenCV.js failed to load')"></script>
+    <!-- 3. eSearch-OCR (PaddleOCR wrapper) -->
+    <script type="module">
+      import * as Paddle from "https://cdn.jsdelivr.net/npm/esearch-ocr@5.1.5/dist/esearch-ocr.js";
+      window.Paddle = Paddle;
+      console.log('✅ PaddleOCR module loaded:', window.Paddle);
+    </script>
+    
+    <!-- OCR functionality will use PaddleOCR with OCR.space fallback -->
     <style>
         .vocab-highlight {
             cursor: pointer;
@@ -373,7 +389,7 @@
                 <div class="mt-6 p-6 bg-gradient-to-r from-orange-50 to-pink-50 rounded-xl border-2 border-orange-300">
                     <h3 class="text-xl font-bold text-gray-800 mb-3">🔍 OCR.space API Key</h3>
                     <p class="text-base text-gray-600 mb-4">
-                        Required for Manga Reader OCR functionality. Free tier: 25,000 requests/month. Get your API key at 
+                        Required for Manga Reader OCR functionality. Free tier: 300 requests/month. Get your API key at 
                         <a href="https://ocr.space/ocrapi" target="_blank" class="text-blue-600 underline font-semibold">ocr.space</a>
                     </p>
                     <div class="flex gap-3">
@@ -398,6 +414,23 @@
                     </div>
                 </div>
 
+                <!-- PaddleOCR Status Display -->
+                <div class="mt-6 p-6 bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl border-2 border-purple-300">
+                    <h4 class="text-xl font-bold text-gray-700 mb-3">🔬 PaddleOCR Status</h4>
+                    <div id="paddleOCRStatus" class="text-base text-gray-600 mb-4">
+                        <p>Status: <span id="paddleStatusText" class="font-semibold">Not initialized</span></p>
+                        <p>Models: <span id="paddleModelsText">Not loaded</span></p>
+                        <p class="mt-2 text-xs text-gray-500">PaddleOCR will auto-initialize on first use (~15MB download)</p>
+                </div>
+                    <button 
+                        id="initPaddleBtn" 
+                        onclick="initializePaddleOCR()" 
+                        class="mt-3 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                        🚀 Pre-initialize PaddleOCR
+                    </button>
+        </div>
+
                 <div id="connectionStatus" class="mt-6"></div>
 
                 <div class="text-base text-gray-600 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl">
@@ -408,9 +441,9 @@
                         <li>Go to Settings → API</li>
                         <li>Generate or copy your API key</li>
                     </ol>
-                </div>
-            </div>
-        </div>
+                        </div>
+                        </div>
+                        </div>
 
         <!-- Feature Sections (Collapsible Dropdowns) -->
         
@@ -756,6 +789,12 @@
 
         // OCR.space API for Japanese OCR
         let ocrApiKey = localStorage.getItem('ocr-space-api-key') || 'helloworld'; // Default to free tier
+        
+        // PaddleOCR state
+        let paddleOCRInitialized = false;
+        let paddleOCRInitializing = false;
+        let paddleOCRError = null;
+        const PADDLE_ASSETS_PATH = "https://cdn.jsdelivr.net/npm/paddleocr-browser/dist/";
 
         // Video Player Variables
         let currentVideoFile = null;
@@ -1017,6 +1056,294 @@
                 throw error;
             }
         }
+
+        /**
+         * Initialize PaddleOCR with models and dictionary
+         * Downloads ~15MB of models on first run (cached after)
+         */
+        async function initializePaddleOCR() {
+            if (paddleOCRInitialized) {
+                console.log('✅ PaddleOCR already initialized');
+                return true;
+            }
+            
+            if (paddleOCRInitializing) {
+                console.log('⏳ PaddleOCR initialization already in progress...');
+                // Wait for existing initialization
+                while (paddleOCRInitializing) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                return paddleOCRInitialized;
+            }
+            
+            paddleOCRInitializing = true;
+            console.log('🚀 Starting PaddleOCR initialization...');
+            
+            try {
+                // Check if Paddle module loaded
+                if (!window.Paddle) {
+                    throw new Error('Paddle module not loaded. Check if eSearch-OCR script loaded correctly.');
+                }
+                console.log('✅ Paddle module found:', window.Paddle);
+                
+                // Check if ort (ONNX Runtime) is available
+                if (typeof ort === 'undefined') {
+                    throw new Error('ONNX Runtime (ort) not loaded. Check if onnxruntime-web script loaded.');
+                }
+                console.log('✅ ONNX Runtime found:', ort.version || 'version unknown');
+                console.log('ℹ️ ONNX may show "Unknown CPU vendor" warnings - these are harmless and do not affect OCR');
+                
+                // Check if OpenCV is ready
+                if (typeof cv === 'undefined') {
+                    console.log('⏳ Waiting for OpenCV.js to load...');
+                    console.log('ℹ️ Ignore any source map warnings from OpenCV.js - they are harmless');
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => reject(new Error('OpenCV load timeout')), 30000);
+                        const checkCV = setInterval(() => {
+                            if (typeof cv !== 'undefined' && cv.Mat) {
+                                clearInterval(checkCV);
+                                clearTimeout(timeout);
+                                console.log('✅ OpenCV.js loaded:', cv.getBuildInformation ? 'v4.8.0' : 'version unknown');
+                                resolve();
+                            }
+                        }, 100);
+                    });
+                } else {
+                    console.log('✅ OpenCV.js already loaded');
+                }
+                
+                // Fetch Japanese dictionary file for better Japanese recognition
+                console.log('📥 Downloading PaddleOCR Japanese dictionary...');
+                let dic;
+                const dicResponse = await fetch(PADDLE_ASSETS_PATH + "dict_japan.txt");
+                if (!dicResponse.ok) {
+                    console.warn('⚠️ Japanese dictionary not found, falling back to default...');
+                    const fallbackDicResponse = await fetch(PADDLE_ASSETS_PATH + "ppocr_keys_v1.txt");
+                    if (!fallbackDicResponse.ok) {
+                        throw new Error(`Dictionary fetch failed: ${fallbackDicResponse.status} ${fallbackDicResponse.statusText}`);
+                    }
+                    dic = await fallbackDicResponse.text();
+                    console.log('✅ Default dictionary loaded, length:', dic.length, 'lines:', dic.split('\n').length);
+                } else {
+                    dic = await dicResponse.text();
+                    console.log('✅ Japanese dictionary loaded, length:', dic.length, 'lines:', dic.split('\n').length);
+                }
+                
+                // Initialize PaddleOCR with Japanese-specific models
+                console.log('🔧 Initializing PaddleOCR with Japanese models (this may take 10-30 seconds)...');
+                console.log('📦 Model paths:', {
+                    detection: PADDLE_ASSETS_PATH + "ppocr_det.onnx",
+                    recognition: PADDLE_ASSETS_PATH + "rec_japan_PP-OCRv3_infer.onnx",
+                    dictionary: 'dict_japan.txt loaded in memory'
+                });
+                
+                await window.Paddle.init({
+                    detPath: PADDLE_ASSETS_PATH + "ppocr_det.onnx",
+                    recPath: PADDLE_ASSETS_PATH + "rec_japan_PP-OCRv3_infer.onnx",
+                    dic: dic,
+                    ort: ort,
+                    node: false,
+                    cv: cv
+                });
+                
+                paddleOCRInitialized = true;
+                paddleOCRError = null;
+                console.log('✅ PaddleOCR initialization complete! Ready for OCR.');
+                showStatus('PaddleOCR initialized successfully!', 'success');
+                
+                return true;
+                
+            } catch (error) {
+                paddleOCRError = error.message;
+                console.error('❌ PaddleOCR initialization failed:', error);
+                console.error('Error stack:', error.stack);
+                showStatus(`PaddleOCR init failed: ${error.message}`, 'error');
+                
+                return false;
+            } finally {
+                paddleOCRInitializing = false;
+            }
+        }
+
+        /**
+         * Perform OCR using PaddleOCR on a canvas or image data URL
+         * @param {string} imageDataURL - Data URL of image to process
+         * @returns {Promise<string>} - Recognized text
+         */
+        async function performOCRWithPaddle(imageDataURL) {
+            console.log('🔍 Starting PaddleOCR recognition...');
+            console.log('📊 Input image data URL length:', imageDataURL.length);
+            
+            try {
+                // Ensure PaddleOCR is initialized
+                if (!paddleOCRInitialized) {
+                    console.log('⚠️ PaddleOCR not initialized, initializing now...');
+                    const success = await initializePaddleOCR();
+                    if (!success) {
+                        throw new Error(`PaddleOCR initialization failed: ${paddleOCRError}`);
+                    }
+                }
+                
+                console.log('🎯 Running PaddleOCR recognition...');
+                const startTime = performance.now();
+                
+                // Call PaddleOCR
+                console.log('📤 Calling window.Paddle.ocr() with data URL...');
+                console.log('📏 Data URL preview (first 100 chars):', imageDataURL.substring(0, 100));
+                
+                const result = await window.Paddle.ocr(imageDataURL);
+                
+                const endTime = performance.now();
+                const duration = ((endTime - startTime) / 1000).toFixed(2);
+                
+                console.log('✅ PaddleOCR recognition complete in', duration, 'seconds');
+                console.log('📦 Raw PaddleOCR result:', result);
+                console.log('📊 Result details:', {
+                    hasSrc: !!(result?.src),
+                    srcLength: result?.src?.length || 0,
+                    hasColumns: !!(result?.columns),
+                    columnsLength: result?.columns?.length || 0,
+                    hasParragraphs: !!(result?.parragraphs),
+                    parragraphsLength: result?.parragraphs?.length || 0
+                });
+                console.log('📊 Result structure:', {
+                    type: typeof result,
+                    isArray: Array.isArray(result),
+                    keys: Object.keys(result || {}),
+                    hasColumns: !!(result?.columns),
+                    columnsLength: result?.columns?.length,
+                    hasParragraphs: !!(result?.parragraphs),
+                    parragraphsLength: result?.parragraphs?.length,
+                    hasParagraphs: !!(result?.paragraphs),
+                    paragraphsLength: result?.paragraphs?.length
+                });
+                
+                // Extract text from result
+                // PaddleOCR result format: { columns: [...], parragraphs: [...] }
+                let extractedText = '';
+                
+                console.log('📊 Processing PaddleOCR result structure...');
+                
+                // Check for paragraphs field (note: it's "parragraphs" not "paragraphs" in the actual result)
+                if (result.parragraphs && Array.isArray(result.parragraphs)) {
+                    console.log(`📝 Found ${result.parragraphs.length} paragraph(s) in result`);
+                    result.parragraphs.forEach((para, index) => {
+                        console.log(`Paragraph ${index + 1}:`, para);
+                        if (para.text) {
+                            extractedText += para.text + '\n';
+                            console.log(`  Text: "${para.text}"`);
+                            console.log(`  Confidence: ${para.mean ? para.mean.toFixed(4) : 'N/A'}`);
+                        }
+                    });
+                }
+                
+                // Check for columns as alternative structure
+                if (!extractedText && result.columns && Array.isArray(result.columns)) {
+                    console.log(`📝 Found ${result.columns.length} column(s) in result`);
+                    result.columns.forEach((col, colIndex) => {
+                        if (col.parragraphs && Array.isArray(col.parragraphs)) {
+                            col.parragraphs.forEach((para, paraIndex) => {
+                                console.log(`Column ${colIndex + 1}, Paragraph ${paraIndex + 1}:`, para);
+                                if (para.text) {
+                                    extractedText += para.text + '\n';
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // Check if it's a simple text string
+                if (!extractedText && result.text) {
+                    extractedText = result.text;
+                    console.log('📝 Simple text result:', extractedText);
+                }
+                
+                // Clean up text - remove extra whitespace but preserve structure
+                extractedText = extractedText.trim();
+                
+                console.log('✅ Extracted text length:', extractedText.length);
+                console.log('📄 Extracted text preview:', extractedText.substring(0, 100));
+                
+                return extractedText;
+                
+            } catch (error) {
+                console.error('❌ PaddleOCR recognition error:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    paddleInitialized: paddleOCRInitialized,
+                    paddleError: paddleOCRError
+                });
+                throw error;
+            }
+        }
+
+        // === PADDLEOCR DEBUG HELPER ===
+        window.debugPaddleOCR = function() {
+            console.log('=== PaddleOCR Debug Info ===');
+            console.log('Paddle module loaded:', !!window.Paddle);
+            console.log('ONNX Runtime loaded:', typeof ort !== 'undefined');
+            console.log('OpenCV loaded:', typeof cv !== 'undefined');
+            console.log('Initialized:', paddleOCRInitialized);
+            console.log('Initializing:', paddleOCRInitializing);
+            console.log('Error:', paddleOCRError);
+            console.log('Assets path:', PADDLE_ASSETS_PATH);
+            
+            if (window.Paddle) {
+                console.log('Paddle methods:', Object.keys(window.Paddle));
+            }
+            
+            if (typeof ort !== 'undefined') {
+                console.log('ORT version:', ort.version);
+            }
+            
+            if (typeof cv !== 'undefined') {
+                console.log('OpenCV build info:', cv.getBuildInformation ? cv.getBuildInformation() : 'Not available');
+            }
+            
+            console.log('=========================');
+        };
+
+        console.log('💡 Debug helper available: Run debugPaddleOCR() in console for status');
+
+        /**
+         * Update PaddleOCR status display
+         */
+        function updatePaddleOCRStatus() {
+            const statusText = document.getElementById('paddleStatusText');
+            const modelsText = document.getElementById('paddleModelsText');
+            const initBtn = document.getElementById('initPaddleBtn');
+            
+            if (!statusText) return;
+            
+            if (paddleOCRInitializing) {
+                statusText.textContent = '⏳ Initializing...';
+                statusText.className = 'font-semibold text-yellow-600';
+                modelsText.textContent = 'Downloading models...';
+                if (initBtn) initBtn.disabled = true;
+            } else if (paddleOCRInitialized) {
+                statusText.textContent = '✅ Ready';
+                statusText.className = 'font-semibold text-green-600';
+                modelsText.textContent = 'Loaded and ready';
+                if (initBtn) {
+                    initBtn.disabled = true;
+                    initBtn.textContent = '✅ Already Initialized';
+                }
+            } else if (paddleOCRError) {
+                statusText.textContent = '❌ Error';
+                statusText.className = 'font-semibold text-red-600';
+                modelsText.textContent = paddleOCRError;
+                if (initBtn) initBtn.disabled = false;
+            } else {
+                statusText.textContent = 'Not initialized';
+                statusText.className = 'font-semibold text-gray-600';
+                modelsText.textContent = 'Will load on first use';
+                if (initBtn) initBtn.disabled = false;
+            }
+        }
+
+        // Update status every second
+        setInterval(updatePaddleOCRStatus, 1000);
 
         // Test OCR.space API availability
         async function testOCRAPI() {
@@ -3642,13 +3969,13 @@ Clear cache to test fresh API calls or free up storage space.
                 }
                 
                 const ctx = canvas.getContext('2d');
-                const img = new Image();
+            const img = new Image();
                 
-                img.onload = () => {
-                    const scale = mangaZoom / 100;
-                    canvas.width = img.width * scale;
-                    canvas.height = img.height * scale;
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            img.onload = () => {
+                const scale = mangaZoom / 100;
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     
                     // Update selection canvas size to match zoomed manga canvas
                     const selectionCanvas = document.getElementById('selectionCanvas');
@@ -3664,16 +3991,16 @@ Clear cache to test fresh API calls or free up storage space.
                     preloadAdjacentPages(pageNum);
                 };
                 
-                img.src = page.imageData;
-                
-                currentMangaPage = pageIndex;
-                updateMangaControls();
-                
-                // Clear OCR overlays when changing pages
-                clearOCROverlays();
-                
-                // Reset selection mode when changing pages
-                resetSelectionMode();
+            img.src = page.imageData;
+
+            currentMangaPage = pageIndex;
+            updateMangaControls();
+
+            // Clear OCR overlays when changing pages
+            clearOCROverlays();
+
+            // Reset selection mode when changing pages
+            resetSelectionMode();
                 
             } catch (error) {
                 console.error('Error displaying page:', error);
@@ -4188,39 +4515,9 @@ Clear cache to test fresh API calls or free up storage space.
                     croppedCanvasSize: { width: croppedCanvas.width, height: croppedCanvas.height }
                 });
 
-                // Try PaddleOCR first, then enhanced Tesseract
+                // Initialize OCR variables
                 let text;
                 let ocrMethod = 'Unknown';
-
-                // Check if PaddleOCR is available
-                if (window.paddlejs && window.paddlejs.ocr) {
-                try {
-                        console.log('🎯 Trying PaddleOCR (primary)...');
-
-                    // Initialize PaddleOCR with built-in models
-                        const ocr = window.paddlejs.ocr;
-                        console.log('Initializing PaddleOCR...');
-                    await ocr.init();
-
-                    // Convert canvas to image element for PaddleOCR
-                    const img = new Image();
-                    img.src = croppedCanvas.toDataURL();
-                    await new Promise(resolve => {
-                        img.onload = resolve;
-                    });
-
-                    const res = await ocr.recognize(img);
-                    text = Array.isArray(res.text) ? res.text.join('\n') : res.text;
-                        ocrMethod = 'PaddleOCR';
-                    console.log('✅ PaddleOCR successful, text length:', text.length);
-
-                } catch (paddleError) {
-                        console.log('⚠️ PaddleOCR failed, falling back to enhanced Tesseract:', paddleError.message);
-                        // Continue to Tesseract fallback below
-                    }
-                } else {
-                    console.log('🔄 PaddleOCR not available, using enhanced Tesseract...');
-                }
 
                 // Prepare PaddleOCR input from original image data
                 // PaddleOCR models are trained on raw images, preprocessing might hurt recognition
@@ -4275,41 +4572,80 @@ Clear cache to test fresh API calls or free up storage space.
                             height: scaledCanvas.height,
                         };
 
-                // Use OCR.space API for high-quality Japanese OCR
-                console.log('🔧 Using OCR.space API for Japanese text recognition...');
+                // === PADDLEOCR PROCESSING ===
+                console.log('🎯 Starting PaddleOCR processing...');
 
-
-                // Use OCR.space API for Japanese text recognition
                 if (!text) {
                     try {
-                        console.log('🔧 Using OCR.space API for Japanese text recognition...');
-
-                        // Send the high-resolution scaled image to OCR.space (using JPEG for smaller file size)
-                        // Try with high quality first, fallback to lower quality if still too large
-                        let imageDataURL = scaledCanvas.toDataURL('image/jpeg', 0.9);
-
-                        // Check file size and reduce quality if needed
-                        const testBlob = await new Promise(resolve => {
-                            scaledCanvas.toBlob(resolve, 'image/jpeg', 0.9);
+                        console.log('🔧 Using PaddleOCR for Japanese manga recognition...');
+                        console.log('📸 Image to process:', {
+                            width: scaledCanvas.width,
+                            height: scaledCanvas.height,
+                            dataURLLength: scaledCanvas.toDataURL().length
                         });
 
-                        if (testBlob.size > 900 * 1024) { // If over 900KB, use lower quality
-                            console.log(`⚠️ Image too large (${(testBlob.size/1024).toFixed(1)} KB), reducing quality...`);
-                            imageDataURL = scaledCanvas.toDataURL('image/jpeg', 0.7);
-                        }
+                // Convert canvas to data URL
+                const imageDataURL = scaledCanvas.toDataURL('image/png');
+                console.log('📊 Created image data URL, length:', imageDataURL.length);
+                console.log('🖼️ Canvas dimensions for OCR:', {
+                    width: scaledCanvas.width,
+                    height: scaledCanvas.height,
+                    hasContent: scaledCanvas.width > 0 && scaledCanvas.height > 0
+                });
 
-                        const ocrText = await performOCRWithSpaceAPI(imageDataURL);
+                // Debug: Draw a small test to verify canvas has content
+                const testCtx = scaledCanvas.getContext('2d');
+                const testImageData = testCtx.getImageData(0, 0, Math.min(100, scaledCanvas.width), Math.min(100, scaledCanvas.height));
+                const testPixels = testImageData.data;
+                let nonWhitePixels = 0;
+                for (let i = 0; i < testPixels.length; i += 4) {
+                    const r = testPixels[i], g = testPixels[i+1], b = testPixels[i+2];
+                    if (r < 250 || g < 250 || b < 250) {
+                        nonWhitePixels++;
+                    }
+                }
+                console.log('🎨 Sample pixel check (first 100x100px):', {
+                    totalPixels: testPixels.length / 4,
+                    nonWhitePixels: nonWhitePixels,
+                    hasContent: nonWhitePixels > 10
+                });
+
+                // Perform OCR with PaddleOCR
+                console.log('⏳ Calling PaddleOCR...');
+                const ocrText = await performOCRWithPaddle(imageDataURL);
 
                         text = ocrText;
-                        ocrMethod = 'OCR.space API (Japanese)';
-                        console.log('✅ OCR.space API successful, extracted text:', JSON.stringify(text));
+                        ocrMethod = 'PaddleOCR (Browser)';
+                        console.log('✅ PaddleOCR successful!');
+                        console.log('📝 Extracted text:', JSON.stringify(text));
+                        console.log('📊 Text stats:', {
+                            length: text.length,
+                            lines: text.split('\n').length,
+                            hasJapanese: /[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(text)
+                        });
 
                     } catch (ocrError) {
-                        console.error('❌ OCR.space API failed:', ocrError);
-                        console.log('⚠️ OCR functionality unavailable - API error');
+                        console.error('❌ PaddleOCR failed:', ocrError);
+                        console.error('❌ Error details:', {
+                            message: ocrError.message,
+                            stack: ocrError.stack,
+                            paddleInitialized: paddleOCRInitialized,
+                            paddleError: paddleOCRError
+                        });
+
+                        // Fallback to OCR.space
+                        console.log('🔄 Falling back to OCR.space API...');
+                        try {
+                            const imageDataURL = scaledCanvas.toDataURL('image/jpeg', 0.9);
+                            text = await performOCRWithSpaceAPI(imageDataURL);
+                            ocrMethod = 'OCR.space API (Fallback)';
+                            console.log('✅ OCR.space fallback successful');
+                        } catch (fallbackError) {
+                            console.error('❌ OCR.space fallback also failed:', fallbackError);
                         text = '';
-                        ocrMethod = 'Failed';
+                            ocrMethod = 'All OCR methods failed';
                     }
+                }
                 }
 
                 console.log('📝 Raw OCR result:', JSON.stringify(text));
@@ -4929,7 +5265,7 @@ Clear cache to test fresh API calls or free up storage space.
             for (let i = 0; i < subtitleData.length; i++) {
                 if (currentTime >= subtitleData[i].start && currentTime <= subtitleData[i].end) {
                     newIndex = i;
-                    break;
+                        break;
                 }
             }
 
