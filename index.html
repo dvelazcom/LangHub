@@ -1064,7 +1064,7 @@
             try {
                 showStatus('Testing connection...', 'info');
 
-                const response = await fetch('/api/jpdb/ping', {
+                const response = await fetch('https://jpdb.io/api/v1/ping', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
@@ -1101,7 +1101,7 @@
 
                 console.log('Parsing text:', `"${originalText}"`);
 
-                const response = await fetch('/api/jpdb/parse', {
+                const response = await fetch('https://jpdb.io/api/v1/parse', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
@@ -1529,7 +1529,7 @@
             deckStatus.textContent = 'Loading decks...';
 
             try {
-                const response = await fetch('/api/jpdb/list-user-decks', {
+                const response = await fetch('https://jpdb.io/api/v1/list-user-decks', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
@@ -1692,7 +1692,7 @@
 
                 // Add vocabulary to deck
                 // According to JPDB API: vocabulary must be array of 2-element arrays [vid, sid]
-                const addResponse = await fetch('/api/jpdb/deck/add-vocabulary', {
+                const addResponse = await fetch(`https://jpdb.io/api/v1/deck/${selectedDeckId}/vocabulary`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
@@ -1721,7 +1721,7 @@
                         sentence: surroundingSentence.substring(0, 50) + '...'
                     });
 
-                    const sentenceResponse = await fetch('/api/jpdb/set-card-sentence', {
+                    const sentenceResponse = await fetch('https://jpdb.io/api/v1/set-card-sentence', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${apiKey}`,
@@ -2454,7 +2454,7 @@
 
         async function parseSingleChunk(rawText) {
             try {
-                const response = await fetch('/api/jpdb/parse', {
+                const response = await fetch('https://jpdb.io/api/v1/parse', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2612,7 +2612,7 @@ Clear cache to test fresh API calls or free up storage space.
                 console.log(`Processing transcript chunk ${i + 1}/${chunks.length}: "${chunk.substring(0, 50)}..."`);
 
                 try {
-                    const response = await fetch('/api/jpdb/parse', {
+                    const response = await fetch('https://jpdb.io/api/v1/parse', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${apiKey}`,
@@ -2698,7 +2698,7 @@ Clear cache to test fresh API calls or free up storage space.
                 console.log(`Processing chunk ${i + 1}/${chunks.length}: "${chunk.substring(0, 50)}..."`);
 
                 try {
-                    const response = await fetch('/api/jpdb/parse', {
+                    const response = await fetch('https://jpdb.io/api/v1/parse', {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${apiKey}`,
