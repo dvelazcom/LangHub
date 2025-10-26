@@ -968,7 +968,7 @@
                 formData.append('isOverlayRequired', 'false'); // No overlay needed for text-only
                 formData.append('detectOrientation', 'true'); // Auto-rotate if needed
                 formData.append('scale', 'true'); // Internal upscaling for better OCR
-                formData.append('OCREngine', '2'); // Use Engine 2 (better for Japanese/manga)
+                formData.append('OCREngine', '1'); // Use Engine 2 (better for Japanese/manga)
 
                 // Debug: Log the parameters we're sending
                 console.log('📤 Sending to OCR.space API:', {
@@ -977,7 +977,7 @@
                     isOverlayRequired: 'false',
                     detectOrientation: 'true',
                     scale: 'true',
-                    OCREngine: '2',
+                    OCREngine: '1',
                     fileSize: blob.size + ' bytes',
                     fileType: blob.type
                 });
