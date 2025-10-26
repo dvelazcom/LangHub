@@ -4552,8 +4552,7 @@ Clear cache to test fresh API calls or free up storage space.
                 console.log('🖼️ OCR Preview Image:', previewImg);
 
                 // Debug: Analyze canvas content
-                const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
-                const pixels = imageData.data;
+                const pixels = ctx.getImageData(0, 0, imageWidth, imageHeight).data;
                 let hasContent = false;
                 let darkPixels = 0;
                 let totalPixels = pixels.length / 4;
