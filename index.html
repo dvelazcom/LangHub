@@ -4625,18 +4625,20 @@ Clear cache to test fresh API calls or free up storage space.
                             dataURLLength: scaledCanvas.toDataURL().length
                         });
 
-                // Convert canvas to data URL
-                const imageDataURL = scaledCanvas.toDataURL('image/png');
+                // iPad: Use raw original canvas instead of preprocessed grayscale
+                // The manga-ocr preprocessing (grayscale + contrast) might be confusing PaddleOCR on iPad
+                console.log('📱 iPad: Attempting OCR with raw canvas (no preprocessing) first...');
+                const originalImageDataURL = croppedCanvas.toDataURL('image/png');
+                console.log('📸 Original canvas size:', croppedCanvas.width, 'x', croppedCanvas.height);
+                
+                // Try raw image first
+                let imageDataURL = originalImageDataURL;
                 console.log('📊 Created image data URL, length:', imageDataURL.length);
-                console.log('🖼️ Canvas dimensions for OCR:', {
-                    width: scaledCanvas.width,
-                    height: scaledCanvas.height,
-                    hasContent: scaledCanvas.width > 0 && scaledCanvas.height > 0
-                });
+                console.log('🖼️ Using original canvas (croppedCanvas) for iPad OCR - avoiding grayscale preprocessing');
 
                 // Debug: Draw a small test to verify canvas has content
-                const testCtx = scaledCanvas.getContext('2d');
-                const testImageData = testCtx.getImageData(0, 0, Math.min(100, scaledCanvas.width), Math.min(100, scaledCanvas.height));
+                const testCtx = croppedCanvas.getContext('2d');
+                const testImageData = testCtx.getImageData(0, 0, Math.min(100, croppedCanvas.width), Math.min(100, croppedCanvas.height));
                 const testPixels = testImageData.data;
                 let nonWhitePixels = 0;
                 for (let i = 0; i < testPixels.length; i += 4) {
@@ -4650,9 +4652,22 @@ Clear cache to test fresh API calls or free up storage space.
                     nonWhitePixels: nonWhitePixels,
                     hasContent: nonWhitePixels > 10
                 });
+                
+                // iPad-specific debugging: Create a download link to inspect the canvas
+                console.log('📱 iPad Canvas Debug - Creating downloadable preview...');
+                const debugLink = document.createElement('a');
+                debugLink.href = imageDataURL;
+                debugLink.download = `ocr-debug-${Date.now()}.png`;
+                debugLink.style.display = 'none';
+                document.body.appendChild(debugLink);
+                console.log('💾 Debug image download link created:', debugLink.href.substring(0, 100) + '...');
+                // Auto-click to download on iPad (user can cancel)
+                // debugLink.click();
+                setTimeout(() => document.body.removeChild(debugLink), 1000);
 
                 // Perform OCR with PaddleOCR
                 console.log('⏳ Calling PaddleOCR...');
+                console.log('📱 iPad Tip: Check if PaddleOCR result is empty - may need image preprocessing');
                 const ocrText = await performOCRWithPaddle(imageDataURL);
 
                         text = ocrText;
