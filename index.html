@@ -1465,7 +1465,7 @@
             if (existing) existing.remove();
 
             const popup = document.createElement('div');
-            popup.className = 'vocab-popup fixed bg-white border rounded-lg shadow-lg p-4 max-w-sm z-50';
+            popup.className = 'vocab-popup absolute bg-white border rounded-lg shadow-lg p-4 max-w-sm z-50';
             popup.innerHTML = `
                 <div class="flex justify-between items-start mb-2">
                     <h3 class="font-bold text-lg">${word}</h3>
@@ -1490,20 +1490,24 @@
             const rect = element.getBoundingClientRect();
             const popupRect = popup.getBoundingClientRect();
 
-            let top = rect.bottom + 5;
-            let left = rect.left;
+            // Calculate position accounting for scroll position in PWA context
+            const scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
+            const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+            
+            let top = rect.bottom + scrollY + 5;
+            let left = rect.left + scrollX;
 
             // Adjust if popup would go off-screen
             if (left + popupRect.width > window.innerWidth) {
                 left = window.innerWidth - popupRect.width - 10;
             }
-            if (top + popupRect.height > window.innerHeight) {
-                top = rect.top - popupRect.height - 5;
+            if (top + popupRect.height > window.innerHeight + scrollY) {
+                top = rect.top + scrollY - popupRect.height - 5;
             }
 
             popup.style.top = top + 'px';
             popup.style.left = left + 'px';
-            popup.style.position = 'fixed';
+            popup.style.position = 'absolute';  // Use absolute for better PWA compatibility
             popup.style.zIndex = '10000';
 
             // Close on outside click
@@ -3683,6 +3687,18 @@ Clear cache to test fresh API calls or free up storage space.
             selectionCanvas.addEventListener('mousedown', startSelection);
             selectionCanvas.addEventListener('mousemove', updateSelection);
             selectionCanvas.addEventListener('mouseup', endSelection);
+            
+            // Touch event handlers for iPad/mobile support
+            selectionCanvas.addEventListener('touchstart', startSelection);
+            selectionCanvas.addEventListener('touchmove', updateSelection);
+            selectionCanvas.addEventListener('touchend', endSelection);
+            
+            // Prevent default touch behaviors (scrolling, zooming) during selection
+            selectionCanvas.addEventListener('touchmove', (e) => {
+                if (isSelectingRegion) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
 
             // Debug: Add listeners for mouse events to see what's happening
             selectionCanvas.addEventListener('mouseenter', () => console.log('Mouse entered selection canvas'));
@@ -3692,6 +3708,14 @@ Clear cache to test fresh API calls or free up storage space.
             window.addEventListener('mouseup', (e) => {
                 if (isSelectingRegion && selectionStart) {
                     console.log('Mouseup detected on window, ending selection');
+                    endSelection(e);
+                }
+            });
+            
+            // Listen for touchend on window for touch devices
+            window.addEventListener('touchend', (e) => {
+                if (isSelectingRegion && selectionStart) {
+                    console.log('Touchend detected on window, ending selection');
                     endSelection(e);
                 }
             });
@@ -3711,9 +3735,14 @@ Clear cache to test fresh API calls or free up storage space.
             canvasRect = canvas.getBoundingClientRect();
 
             const rect = canvasRect;
+            
+            // Support both mouse and touch events
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
             selectionStart = {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
+                x: clientX - rect.left,
+                y: clientY - rect.top
             };
 
             console.log('Selection started at:', selectionStart, 'canvas rect:', rect);
@@ -3728,9 +3757,14 @@ Clear cache to test fresh API calls or free up storage space.
             canvasRect = canvas.getBoundingClientRect();
 
             const rect = canvasRect;
-            console.log('updateSelection called with mouse at:', e.clientX, e.clientY, 'canvas rect:', rect);
-            const currentX = e.clientX - rect.left;
-            const currentY = e.clientY - rect.top;
+            
+            // Support both mouse and touch events
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            console.log('updateSelection called with input at:', clientX, clientY, 'canvas rect:', rect);
+            const currentX = clientX - rect.left;
+            const currentY = clientY - rect.top;
 
             const width = Math.abs(currentX - selectionStart.x);
             const height = Math.abs(currentY - selectionStart.y);
@@ -3742,8 +3776,12 @@ Clear cache to test fresh API calls or free up storage space.
         }
 
         function endSelection(e) {
+            // Support both mouse and touch events
+            const clientX = (e.changedTouches ? e.changedTouches[0].clientX : e.clientX);
+            const clientY = (e.changedTouches ? e.changedTouches[0].clientY : e.clientY);
+            
             console.log('endSelection called, isSelectingRegion:', isSelectingRegion, 'selectionStart:', selectionStart, 'currentSelection:', currentSelection);
-            console.log('Mouse event coordinates:', e.clientX, e.clientY);
+            console.log('Input event coordinates:', clientX, clientY);
 
             if (!isSelectingRegion || !selectionStart) {
                 console.log('Selection not started, ignoring');
@@ -3753,8 +3791,8 @@ Clear cache to test fresh API calls or free up storage space.
             // If we don't have currentSelection yet (user clicked but didn't drag), create a minimal selection
             if (!currentSelection) {
                 const rect = canvasRect;
-                const currentX = e.clientX - rect.left;
-                const currentY = e.clientY - rect.top;
+                const currentX = clientX - rect.left;
+                const currentY = clientY - rect.top;
                 const width = Math.abs(currentX - selectionStart.x);
                 const height = Math.abs(currentY - selectionStart.y);
                 const left = Math.min(currentX, selectionStart.x);
