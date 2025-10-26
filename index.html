@@ -1173,15 +1173,38 @@
         async function performOCRWithPaddle(imageDataURL) {
             console.log('🔍 Starting PaddleOCR recognition...');
             console.log('📊 Input image data URL length:', imageDataURL.length);
+            console.log('📱 iPad Debug - State:', {
+                paddleOCRInitialized,
+                paddleOCRInitializing,
+                paddleOCRError,
+                hasPaddle: !!window.Paddle,
+                memoryUsage: performance.memory ? {
+                    used: Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB',
+                    total: Math.round(performance.memory.totalJSHeapSize / 1048576) + ' MB',
+                    limit: Math.round(performance.memory.jsHeapSizeLimit / 1048576) + ' MB'
+                } : 'Not available'
+            });
             
             try {
                 // Ensure PaddleOCR is initialized
                 if (!paddleOCRInitialized) {
                     console.log('⚠️ PaddleOCR not initialized, initializing now...');
+                    // Re-initialize if failed
+                    if (paddleOCRError) {
+                        console.log('🔄 Resetting PaddleOCR state and re-initializing...');
+                        paddleOCRInitialized = false;
+                        paddleOCRError = null;
+                    }
                     const success = await initializePaddleOCR();
                     if (!success) {
                         throw new Error(`PaddleOCR initialization failed: ${paddleOCRError}`);
                     }
+                }
+                
+                // Extra check for iPad - verify Paddle is actually usable
+                if (!window.Paddle || typeof window.Paddle.ocr !== 'function') {
+                    console.error('❌ Paddle.ocr is not a function or not available');
+                    throw new Error('Paddle.ocr method not available - re-initialization may be needed');
                 }
                 
                 console.log('🎯 Running PaddleOCR recognition...');
@@ -1191,7 +1214,25 @@
                 console.log('📤 Calling window.Paddle.ocr() with data URL...');
                 console.log('📏 Data URL preview (first 100 chars):', imageDataURL.substring(0, 100));
                 
-                const result = await window.Paddle.ocr(imageDataURL);
+                let result;
+                try {
+                    result = await window.Paddle.ocr(imageDataURL);
+                } catch (ocrCallError) {
+                    console.error('❌ Paddle.ocr() call failed:', ocrCallError);
+                    console.error('Error details:', {
+                        message: ocrCallError.message,
+                        stack: ocrCallError.stack
+                    });
+                    // For iPad, try re-initializing if the call fails
+                    if (ocrCallError.message.includes('not initialized') || ocrCallError.message.includes('worker')) {
+                        console.log('🔄 OCR call failed - resetting and re-initializing...');
+                        paddleOCRInitialized = false;
+                        await initializePaddleOCR();
+                        result = await window.Paddle.ocr(imageDataURL);
+                    } else {
+                        throw ocrCallError;
+                    }
+                }
                 
                 const endTime = performance.now();
                 const duration = ((endTime - startTime) / 1000).toFixed(2);
