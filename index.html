@@ -373,7 +373,7 @@
                 <div class="mt-6 p-6 bg-gradient-to-r from-orange-50 to-pink-50 rounded-xl border-2 border-orange-300">
                     <h3 class="text-xl font-bold text-gray-800 mb-3">🔍 OCR.space API Key</h3>
                     <p class="text-base text-gray-600 mb-4">
-                        Required for Manga Reader OCR functionality. Free tier: 300 requests/month. Get your API key at 
+                        Required for Manga Reader OCR functionality. Free tier: 25,000 requests/month. Get your API key at 
                         <a href="https://ocr.space/ocrapi" target="_blank" class="text-blue-600 underline font-semibold">ocr.space</a>
                     </p>
                     <div class="flex gap-3">
@@ -4610,18 +4610,6 @@ Clear cache to test fresh API calls or free up storage space.
 
             document.getElementById('nextMangaPageBtn').addEventListener('click', function() {
                 displayMangaPage(currentMangaPage + 1);
-            });
-
-            document.getElementById('zoomInBtn').addEventListener('click', function() {
-                zoomManga(1.25);
-            });
-
-            document.getElementById('zoomOutBtn').addEventListener('click', function() {
-                zoomManga(0.8);
-            });
-
-            document.getElementById('resetZoomBtn').addEventListener('click', function() {
-                resetMangaZoom();
             });
 
             // OCR Region Selection event listeners
