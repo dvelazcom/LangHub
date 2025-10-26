@@ -527,26 +527,12 @@
                             ➡️ Page
                         </button>
                     </div>
-                    <div class="flex gap-3">
-                        <button id="zoomOutBtn" class="px-4 py-3 bg-gradient-to-r from-purple-400 to-purple-500 text-white text-base font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300" disabled>
-                            🔍-
-                        </button>
-                        <span id="zoomIndicator" class="px-4 py-3 bg-gradient-to-r from-purple-100 to-purple-200 text-purple-700 rounded-xl min-w-[80px] text-center text-base font-semibold shadow-md">
-                            100%
-                        </span>
-                        <button id="zoomInBtn" class="px-4 py-3 bg-gradient-to-r from-purple-400 to-purple-500 text-white text-base font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300" disabled>
-                            🔍+
-                        </button>
-                        <button id="resetZoomBtn" class="px-4 py-3 bg-gradient-to-r from-purple-300 to-purple-400 text-white text-base font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300" disabled>
-                            Reset
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Manga Display Area -->
                 <div id="mangaDisplay" class="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center bg-gradient-to-br from-gray-50 to-green-50 min-h-[400px] hidden shadow-lg">
                     <div class="relative inline-block">
-                        <canvas id="mangaCanvas" class="max-w-full max-h-[60vh] border shadow-sm bg-white mx-auto"></canvas>
+                        <canvas id="mangaCanvas" class="max-w-full max-h-[80vh] border shadow-sm bg-white mx-auto"></canvas>
                         <!-- OCR Region Selection Overlay -->
                         <div id="ocrOverlay" class="absolute top-0 left-0 pointer-events-none">
                             <canvas id="selectionCanvas" class="absolute top-0 left-0 pointer-events-auto cursor-crosshair"></canvas>
@@ -3700,8 +3686,6 @@ Clear cache to test fresh API calls or free up storage space.
             const prevBtn = document.getElementById('prevMangaPageBtn');
             const nextBtn = document.getElementById('nextMangaPageBtn');
             const indicator = document.getElementById('mangaPageIndicator');
-            const zoomBtns = ['zoomOutBtn', 'zoomInBtn', 'resetZoomBtn'].map(id => document.getElementById(id));
-            const zoomIndicator = document.getElementById('zoomIndicator');
             const display = document.getElementById('mangaDisplay');
 
             if (mangaPages.length > 0) {
@@ -3709,16 +3693,11 @@ Clear cache to test fresh API calls or free up storage space.
                 prevBtn.disabled = currentMangaPage === 0;
                 nextBtn.disabled = currentMangaPage >= mangaPages.length - 1;
                 indicator.textContent = `${currentMangaPage + 1} / ${mangaPages.length}`;
-
-                zoomBtns.forEach(btn => btn.disabled = false);
-                zoomIndicator.textContent = mangaZoom + '%';
             } else {
                 display.classList.add('hidden');
                 prevBtn.disabled = true;
                 nextBtn.disabled = true;
                 indicator.textContent = 'Ready';
-                zoomBtns.forEach(btn => btn.disabled = true);
-                zoomIndicator.textContent = '100%';
             }
         }
 
@@ -4702,19 +4681,6 @@ Clear cache to test fresh API calls or free up storage space.
                     case 'd':
                         e.preventDefault();
                         displayMangaPage(currentMangaPage + 1);
-                        break;
-                    case '+':
-                    case '=':
-                        e.preventDefault();
-                        zoomManga(1.25);
-                        break;
-                    case '-':
-                        e.preventDefault();
-                        zoomManga(0.8);
-                        break;
-                    case '0':
-                        e.preventDefault();
-                        resetMangaZoom();
                         break;
                 }
             });
