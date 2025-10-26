@@ -341,11 +341,11 @@
                         >
                             <option value="">No decks loaded</option>
                         </select>
-                    </div>
+                </div>
                     <div id="selectedDeck" class="mt-3 px-4 py-3 bg-white rounded-xl border-2 border-blue-400 text-base font-semibold shadow-md">
                         No deck selected
-                    </div>
-                </div>
+            </div>
+        </div>
 
                 <!-- Cache Management Section -->
                 <div class="mt-6 p-6 bg-gradient-to-r from-gray-50 to-orange-50 rounded-xl border-2 border-orange-300">
@@ -383,18 +383,18 @@
                             placeholder="Enter your OCR.space API key (helloworld for free tier)"
                             class="flex-1 px-4 py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
                         >
-                        <button
+                    <button
                             onclick="saveOcrApiKey()"
                             class="px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-600 text-white text-base font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
-                        >
+                    >
                             💾 Save
-                        </button>
-                        <button
+                    </button>
+                    <button
                             onclick="testOcrConnection()"
                             class="px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white text-base font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
-                        >
+                    >
                             🧪 Test
-                        </button>
+                    </button>
                     </div>
                 </div>
 
@@ -430,7 +430,7 @@
                         accept="video/*"
                         class="block w-full text-base text-gray-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-base file:font-semibold file:bg-gradient-to-r file:from-blue-50 file:to-purple-50 file:text-blue-700 hover:file:bg-blue-100"
                     >
-                </div>
+        </div>
 
                 <!-- Subtitle File Input -->
                 <div>
@@ -450,10 +450,10 @@
                     </button>
                     <button id="playPauseBtn" class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-base font-semibold rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300" disabled>
                         ▶️ Play
-                    </button>
+                        </button>
                     <span id="videoStatus" class="px-6 py-3 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl text-base font-semibold shadow-md">
-                        Ready
-                    </span>
+                            Ready
+                        </span>
                 </div>
 
                 <!-- Video Player Container -->
@@ -476,23 +476,23 @@
                                 <div class="flex gap-1">
                                     <button id="generateTranscriptBtn" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs transition-colors hidden">
                                         📝 Parse
-                                    </button>
+                        </button>
                                     <button id="autoScrollBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs transition-colors">
                                         🔄 Auto
                                     </button>
                                     <button id="searchTranscriptBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs transition-colors">
                                         🔍
-                                    </button>
-                                </div>
-                            </div>
+                        </button>
+                    </div>
+                </div>
 
                             <div id="transcriptContent" class="max-h-[400px] overflow-y-auto text-xs leading-relaxed">
                                 <!-- Transcript will appear here -->
-                            </div>
-                        </div>
+                </div>
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
         <!-- Manga Reader Section -->
@@ -574,8 +574,8 @@
                         <!-- OCR results with JPDB highlighting will appear here -->
                     </div>
                 </div>
-            </div>
-        </div>
+                    </div>
+                </div>
 
         <!-- EPUB Reader Section -->
         <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-8 mb-12 border-2 border-indigo-300">
@@ -751,6 +751,12 @@
         let mangaPages = [];
         let currentMangaPage = 0;
         let mangaZoom = 100;
+        
+        // Lazy loading variables
+        let currentMangaPdf = null;
+        let mangaPageCache = new Map();
+        let mangaTotalPages = 0;
+        const MAX_CACHED_PAGES = 5;
 
         // OCR Region Selection variables
         let isSelectingRegion = false;
@@ -3469,35 +3475,27 @@ Clear cache to test fresh API calls or free up storage space.
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-                console.log('PDF loaded with', pdf.numPages, 'pages - Rendering at 3x scale for OCR quality');
+                console.log('PDF loaded with', pdf.numPages, 'pages - Using lazy loading');
 
-                // Render all pages at high resolution for OCR quality
+                // Store PDF reference for lazy loading
+                currentMangaPdf = pdf;
+                mangaTotalPages = pdf.numPages;
+                mangaPageCache.clear();
+                mangaPages = [];
+
+                // Create placeholder entries for all pages
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                    const page = await pdf.getPage(pageNum);
-                    const viewport = page.getViewport({ scale: 3.0 }); // High scale for excellent OCR quality
-
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-
-                    await page.render({
-                        canvasContext: context,
-                        viewport: viewport
-                    }).promise;
-
-                    const imageData = canvas.toDataURL('image/png');
                     mangaPages.push({
-                        imageData: imageData,
+                        imageData: null,
                         ocrText: '',
                         pageNumber: pageNum
                     });
                 }
 
-                console.log('Rendered', mangaPages.length, 'pages');
+                console.log('Created', mangaPages.length, 'page placeholders');
 
-                // Show the first page
-                displayMangaPage(0);
+                // Render and show the first page immediately
+                await displayMangaPage(0);
 
                 // Enable controls
                 updateMangaControls();
@@ -3549,30 +3547,152 @@ Clear cache to test fresh API calls or free up storage space.
             }
         }
 
-        function displayMangaPage(pageIndex) {
+        // Lazy page rendering with caching
+        async function renderMangaPage(pageNum) {
+            console.log('Rendering page', pageNum, '...');
+            
+            // Check cache first
+            if (mangaPageCache.has(pageNum)) {
+                const cached = mangaPageCache.get(pageNum);
+                console.log('Page', pageNum, 'already in cache');
+                return cached;
+            }
+            
+            // Check if page data already exists
+            const pageIndex = pageNum - 1;
+            if (mangaPages[pageIndex] && mangaPages[pageIndex].imageData) {
+                console.log('Page', pageNum, 'already rendered');
+                return mangaPages[pageIndex];
+            }
+            
+            // Render page at high resolution for OCR quality
+            const page = await currentMangaPdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 3.0 });
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            await page.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+            
+            const pageData = {
+                imageData: canvas.toDataURL('image/png'),
+                ocrText: '',
+                pageNumber: pageNum
+            };
+            
+            // Cache the page
+            mangaPageCache.set(pageNum, pageData);
+            mangaPages[pageIndex] = pageData;
+            
+            console.log('Page', pageNum, 'rendered and cached');
+            
+            // Evict old pages to manage memory
+            evictOldPages(pageNum);
+            
+            return pageData;
+        }
+
+        function preloadAdjacentPages(currentPage) {
+            const preloadPages = [];
+            
+            // Preload previous and next pages
+            if (currentPage > 1) preloadPages.push(currentPage - 1);
+            if (currentPage < mangaTotalPages) preloadPages.push(currentPage + 1);
+            
+            // Preload pages 2 positions away for smooth navigation
+            if (currentPage > 2) preloadPages.push(currentPage - 2);
+            if (currentPage < mangaTotalPages - 1) preloadPages.push(currentPage + 2);
+            
+            for (const pageNum of preloadPages) {
+                if (!mangaPageCache.has(pageNum)) {
+                    renderMangaPage(pageNum).catch(err => 
+                        console.log(`Preload failed for page ${pageNum}:`, err)
+                    );
+                }
+            }
+        }
+
+        function evictOldPages(currentPage) {
+            // Keep current page and nearby pages (max 5 pages in cache)
+            if (mangaPageCache.size > MAX_CACHED_PAGES) {
+                const keepPages = new Set();
+                
+                // Keep current page and 2 pages before/after
+                for (let i = Math.max(1, currentPage - 2); i <= Math.min(mangaTotalPages, currentPage + 2); i++) {
+                    keepPages.add(i);
+                }
+                
+                // Evict pages not in keep set
+                for (const [pageNum] of mangaPageCache) {
+                    if (!keepPages.has(pageNum)) {
+                        mangaPageCache.delete(pageNum);
+                        console.log('Evicted page', pageNum, 'from cache');
+                    }
+                }
+            }
+        }
+
+        async function displayMangaPage(pageIndex) {
             if (pageIndex < 0 || pageIndex >= mangaPages.length) return;
 
-            const page = mangaPages[pageIndex];
             const canvas = document.getElementById('mangaCanvas');
-            const ctx = canvas.getContext('2d');
-
-            const img = new Image();
-            img.onload = () => {
-                const scale = mangaZoom / 100;
-                canvas.width = img.width * scale;
-                canvas.height = img.height * scale;
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            };
-            img.src = page.imageData;
-
-            currentMangaPage = pageIndex;
-            updateMangaControls();
-
-            // Clear OCR overlays when changing pages
-            clearOCROverlays();
-
-            // Reset selection mode when changing pages
-            resetSelectionMode();
+            const pageNum = pageIndex + 1;
+            
+            // Show loading indicator
+            showMangaLoadingOverlay(`Loading page ${pageNum}...`);
+            
+            try {
+                // Render page using lazy loading
+                const page = await renderMangaPage(pageNum);
+                
+                if (!page || !page.imageData) {
+                    console.error('Failed to render page', pageNum);
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = () => {
+                    const scale = mangaZoom / 100;
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Update selection canvas size to match zoomed manga canvas
+                    const selectionCanvas = document.getElementById('selectionCanvas');
+                    if (selectionCanvas) {
+                        selectionCanvas.width = canvas.width;
+                        selectionCanvas.height = canvas.height;
+                    }
+                    
+                    // Hide loading indicator
+                    hideMangaLoadingOverlay();
+                    
+                    // Preload adjacent pages in background
+                    preloadAdjacentPages(pageNum);
+                };
+                
+                img.src = page.imageData;
+                
+                currentMangaPage = pageIndex;
+                updateMangaControls();
+                
+                // Clear OCR overlays when changing pages
+                clearOCROverlays();
+                
+                // Reset selection mode when changing pages
+                resetSelectionMode();
+                
+            } catch (error) {
+                console.error('Error displaying page:', error);
+                hideMangaLoadingOverlay();
+            }
         }
 
 
@@ -3689,7 +3809,15 @@ Clear cache to test fresh API calls or free up storage space.
             selectionCanvas.addEventListener('mouseup', endSelection);
             
             // Touch event handlers for iPad/mobile support
-            selectionCanvas.addEventListener('touchstart', startSelection);
+            selectionCanvas.addEventListener('touchstart', (e) => {
+                // Check for two-finger pinch gesture - don't start selection
+                if (e.touches.length === 2) {
+                    touchState.isPinching = true;
+                    isSelectingRegion = false; // Cancel any active selection
+                    return; // Don't start region selection
+                }
+                startSelection(e);
+            });
             selectionCanvas.addEventListener('touchmove', updateSelection);
             selectionCanvas.addEventListener('touchend', endSelection);
             
@@ -4368,8 +4496,24 @@ Clear cache to test fresh API calls or free up storage space.
 
         function clearOCROverlays() {
             const ocrOverlay = document.getElementById('ocrOverlay');
+            
+            // Clear all OCR text overlays (text bubbles)
             ocrOverlay.innerHTML = '';
             ocrOverlays = [];
+            
+            // Clear the current selection region box
+            clearCurrentSelection();
+            
+            // Re-create selection canvas to ensure it's still functional
+            const canvas = document.getElementById('mangaCanvas');
+            const selectionCanvas = document.getElementById('selectionCanvas');
+            
+            if (canvas && selectionCanvas) {
+                const rect = canvas.getBoundingClientRect();
+                selectionCanvas.width = rect.width;
+                selectionCanvas.height = rect.height;
+            }
+            
             updateSelectionStatus('Overlays cleared. Ready to select region.');
         }
 
@@ -5541,6 +5685,12 @@ Clear cache to test fresh API calls or free up storage space.
                 setupPinchZoom(pdfViewer);
             }
 
+            // Manga reader pinch-to-zoom
+            const mangaCanvas = document.getElementById('mangaCanvas');
+            if (mangaCanvas) {
+                setupMangaPinchZoom(mangaCanvas);
+            }
+
             // Video player swipe navigation
             const videoPlayer = document.getElementById('videoPlayer');
             if (videoPlayer) {
@@ -5614,6 +5764,61 @@ Clear cache to test fresh API calls or free up storage space.
             element.addEventListener('touchend', (e) => {
                 if (e.touches.length < 2) {
                     touchState.isPinching = false;
+                }
+            });
+        }
+
+        // Pinch-to-zoom for Manga Reader
+        function setupMangaPinchZoom(canvas) {
+            let initialDistance = 0;
+            let initialZoom = 100;
+            
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    touchState.isPinching = true;
+                    
+                    // Calculate initial distance
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    initialDistance = Math.hypot(
+                        touch1.clientX - touch2.clientX,
+                        touch1.clientY - touch2.clientY
+                    );
+                    
+                    // Store current zoom level
+                    initialZoom = mangaZoom;
+                    console.log('Manga pinch started, initial zoom:', initialZoom);
+                }
+            });
+            
+            canvas.addEventListener('touchmove', (e) => {
+                if (touchState.isPinching && e.touches.length === 2) {
+                    e.preventDefault();
+                    
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    const currentDistance = Math.hypot(
+                        touch1.clientX - touch2.clientX,
+                        touch1.clientY - touch2.clientY
+                    );
+                    
+                    // Calculate zoom factor
+                    const zoomFactor = currentDistance / initialDistance;
+                    const newZoom = Math.max(25, Math.min(300, initialZoom * zoomFactor));
+                    
+                    // Update mangaZoom and redraw
+                    if (Math.abs(newZoom - mangaZoom) > 1) { // Only update if change is significant
+                        mangaZoom = newZoom;
+                        displayMangaPage(currentMangaPage);
+                    }
+                }
+            });
+            
+            canvas.addEventListener('touchend', (e) => {
+                if (e.touches.length < 2) {
+                    touchState.isPinching = false;
+                    console.log('Manga pinch ended, final zoom:', mangaZoom);
                 }
             });
         }
