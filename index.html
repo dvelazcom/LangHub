@@ -4492,27 +4492,42 @@ Clear cache to test fresh API calls or free up storage space.
                 // iPad: Capture ORIGINAL image before preprocessing for better OCR
                 console.log('📱 Capturing ORIGINAL image data before any preprocessing...');
                 
-                // First, draw the ORIGINAL image without any filters (for iPad OCR)
-                ctx.drawImage(img,
+                // Create a SEPARATE canvas for the original unprocessed image (iPad OCR)
+                const originalUnprocessedCanvas = document.createElement('canvas');
+                const originalUnprocessedCtx = originalUnprocessedCanvas.getContext('2d');
+                originalUnprocessedCanvas.width = imageWidth;
+                originalUnprocessedCanvas.height = imageHeight;
+                
+                // Draw the ORIGINAL image without any filters (for iPad OCR)
+                originalUnprocessedCtx.drawImage(img,
                     imageX, imageY, imageWidth, imageHeight,
                     0, 0, imageWidth, imageHeight
                 );
                 
                 // Get the ORIGINAL unscaled/unprocessed image for PaddleOCR (iPad)
-                const originalImageDataURL = croppedCanvas.toDataURL('image/png');
+                const originalImageDataURL = originalUnprocessedCanvas.toDataURL('image/png');
                 console.log('💾 Original unscaled image captured:', originalImageDataURL.substring(0, 100) + '...');
+                console.log('📸 Original image dimensions:', originalUnprocessedCanvas.width, 'x', originalUnprocessedCanvas.height);
                 
                 // Apply manga-ocr preprocessing: convert to grayscale then back to RGB
-                ctx.clearRect(0, 0, imageWidth, imageHeight);
-                ctx.filter = 'grayscale(100%)';
                 ctx.drawImage(img,
                     imageX, imageY, imageWidth, imageHeight,
                     0, 0, imageWidth, imageHeight
                 );
 
-                // Reset filter and get the grayscale data
+                // Reset filter and get the image data
                 ctx.filter = 'none';
-                const grayscaleData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+                const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+                
+                // Manually convert to grayscale
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i], g = data[i + 1], b = data[i + 2];
+                    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+                    data[i] = data[i + 1] = data[i + 2] = gray;
+                }
+                
+                const grayscaleData = imageData;
 
                 // Apply contrast enhancement (manga-ocr style)
                 const data = grayscaleData.data;
