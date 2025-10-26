@@ -4520,7 +4520,7 @@ Clear cache to test fresh API calls or free up storage space.
                 const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
                 
                 // Manually convert to grayscale
-                const data = imageData.data;
+                let data = imageData.data;
                 for (let i = 0; i < data.length; i += 4) {
                     const r = data[i], g = data[i + 1], b = data[i + 2];
                     const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
@@ -4530,7 +4530,7 @@ Clear cache to test fresh API calls or free up storage space.
                 const grayscaleData = imageData;
 
                 // Apply contrast enhancement (manga-ocr style)
-                const data = grayscaleData.data;
+                data = grayscaleData.data;
                 for (let i = 0; i < data.length; i += 4) {
                     // Simple contrast boost - manga often has high contrast text
                     const gray = data[i]; // R=G=B in grayscale
