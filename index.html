@@ -4489,7 +4489,21 @@ Clear cache to test fresh API calls or free up storage space.
                 croppedCanvas.height = imageHeight;
                 console.log('📐 Cropped region size:', imageWidth, 'x', imageHeight);
 
+                // iPad: Capture ORIGINAL image before preprocessing for better OCR
+                console.log('📱 Capturing ORIGINAL image data before any preprocessing...');
+                
+                // First, draw the ORIGINAL image without any filters (for iPad OCR)
+                ctx.drawImage(img,
+                    imageX, imageY, imageWidth, imageHeight,
+                    0, 0, imageWidth, imageHeight
+                );
+                
+                // Get the ORIGINAL unscaled/unprocessed image for PaddleOCR (iPad)
+                const originalImageDataURL = croppedCanvas.toDataURL('image/png');
+                console.log('💾 Original unscaled image captured:', originalImageDataURL.substring(0, 100) + '...');
+                
                 // Apply manga-ocr preprocessing: convert to grayscale then back to RGB
+                ctx.clearRect(0, 0, imageWidth, imageHeight);
                 ctx.filter = 'grayscale(100%)';
                 ctx.drawImage(img,
                     imageX, imageY, imageWidth, imageHeight,
@@ -4625,16 +4639,13 @@ Clear cache to test fresh API calls or free up storage space.
                             dataURLLength: scaledCanvas.toDataURL().length
                         });
 
-                // iPad: Use raw original canvas instead of preprocessed grayscale
-                // The manga-ocr preprocessing (grayscale + contrast) might be confusing PaddleOCR on iPad
-                console.log('📱 iPad: Attempting OCR with raw canvas (no preprocessing) first...');
-                const originalImageDataURL = croppedCanvas.toDataURL('image/png');
-                console.log('📸 Original canvas size:', croppedCanvas.width, 'x', croppedCanvas.height);
+                // iPad: Use the ORIGINAL unscaled/unprocessed image captured BEFORE any preprocessing
+                console.log('📱 iPad: Using ORIGINAL unscaled image data (captured before preprocessing)...');
+                console.log('📸 Image size:', imageWidth, 'x', imageHeight);
                 
-                // Try raw image first
+                // Use the originalImageDataURL captured earlier (before grayscale/contrast processing)
                 let imageDataURL = originalImageDataURL;
-                console.log('📊 Created image data URL, length:', imageDataURL.length);
-                console.log('🖼️ Using original canvas (croppedCanvas) for iPad OCR - avoiding grayscale preprocessing');
+                console.log('📊 Original unscaled image data URL length:', imageDataURL.length);
 
                 // Debug: Draw a small test to verify canvas has content
                 const testCtx = croppedCanvas.getContext('2d');
